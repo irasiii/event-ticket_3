@@ -337,38 +337,19 @@ Goal: copy assignment_2 → a new repo/folder, keep assignment_2 untouched.
 
 ---
 
-## 14. Cheat sheet
+## 14. Live build status (branches → Jira → PR → CI)
 
-```bash
-# run locally
-cd backend && npm run dev
-cd frontend && npm run dev
-npm run seed                      # reseed DB
+Each Jira task has its own branch with its own commit/file. Open a PR per branch into
+`main`; `ci.yml` runs on the PR (tests + build); review and merge; then promote `main` →
+`production`.
 
-# tests
-cd backend && npm test
-npx mocha --grep "Strategy"
+### event-ticket_2 (assignment_2) — branches carry the real files
 
-# git: new task branch
-git checkout main && git checkout -b feature/<name>
-git add <files> && git commit -m "feat: ..."
-git push -u origin feature/<name>
-
-# PR + merge (gh CLI)
-gh pr create --base main --head feature/<name> --fill
-gh pr merge feature/<name> --merge --delete-branch
-
-# promote to production (deploys)
-gh pr create --base production --head main --fill
-gh pr merge --merge
-
-# AWS via Terraform (local)
-cd terraform && terraform init && terraform plan && terraform apply
-terraform output summary
-terraform destroy                 # when done
-```
-
----
-
-*Generated as a personal runbook. Keep this file in the repo root so the whole team can
-follow the same steps.*
+| Branch | Jira | Commit | Contents |
+|---|---|---|---|
+| `feature/oop-principles` | SCRUM-262 | 1022dc0 | `backend/domain/*` + `authController.js` |
+| `feature/design-patterns` | SCRUM-263 | 31ba951 | `backend/patterns/*` + `services/bookingService.js` + controllers + `eventRoutes.js` |
+| `feature/unit-testing` | SCRUM-264 | 27e0ccf | `backend/test/*` + `package.json` / `package-lock.json` |
+| `feature/postman-tests` | SCRUM-265 | bbaf377 | `postman/*` |
+| `feature/aws-cicd` | SCRUM-266 | ba00223 | `DEPLOYMENT.md`, `arch.png` |
+| `docs/assignment2` | 
