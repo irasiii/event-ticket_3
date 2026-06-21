@@ -347,9 +347,106 @@ Each Jira task has its own branch with its own commit/file. Open a PR per branch
 
 The 3 **code** branches are **stacked** (`oop ⊂ design-patterns ⊂ unit-testing`) so the
 tests have the code they import — otherwise the unit-testing PR would fail CI with
-"Cannot find module". CI verified: `npm test` → **40 passing** on `feature/unit-testing`.
+"Cannot find module". Verified locally: `npm test` → **40 passing**, frontend `npm run build`
+ok, and merging all 6 branches → **0 conflicts**, 40 passing, all modules load.
 
 | Branch | Jira | Commit | Built on | Contents | CI |
 |---|---|---|---|---|---|
-| `feature/oop-principles` | SCRUM-262 | e7f5fb0 | main | `backend/domain/*` + `authController.js` | green (tests skipped — no test script) |
-| `feature/design-patterns` | SCRUM-263 | 40aacd3 | oop | `backe
+| `feature/oop-principles` | SCRUM-262 | e7f5fb0 | main | `backend/domain/*` + `authController.js` | green (tests skipped) |
+| `feature/design-patterns` | SCRUM-263 | 40aacd3 | oop | `patterns/*` + `services/` + controllers + `eventRoutes.js` | green (tests skipped) |
+| `feature/unit-testing` | SCRUM-264 | 7ac1d08 | design-patterns | `backend/test/*` + `package.json`/lock | green (**runs 40 tests**) |
+| `feature/postman-tests` | SCRUM-265 | bbaf377 | main | `postman/*` | green (tests skipped) |
+| `feature/aws-cicd` | SCRUM-266 | ba00223 | main | `DEPLOYMENT.md`, `arch.png` | green (tests skipped) |
+| `docs/assignment2` | SCRUM-267 | 0902484 | main | reports (`.docx`), diagrams (`.drawio`), screenshots | green (tests skipped) |
+
+> Branches without a `test` script skip the test step (`npm test --if-present`) and pass on
+> the frontend build. Only `feature/unit-testing` runs the 40 tests. **Merge the code
+> branches in order** (oop → design-patterns → unit-testing) so each PR diff is clean.
+
+### event-ticket_3 (assignment_3) — full code on `main`; each branch has a task scaffold
+
+`main` already has the full code + test setup, so CI runs the 40 tests on every PR.
+
+| Branch | Jira | Marker file |
+|---|---|---|
+| `feature/oop-principles` | SCRUM-269 | `docs/tasks/feature_oop-principles.md` |
+| `feature/design-patterns` | SCRUM-271 | `docs/tasks/feature_design-patterns.md` |
+| `feature/unit-testing` | SCRUM-273 | `docs/tasks/feature_unit-testing.md` |
+| `feature/postman-tests` | SCRUM-274 | `docs/tasks/feature_postman-tests.md` |
+| `feature/aws-cicd` | SCRUM-272 | `docs/tasks/feature_aws-cicd.md` |
+| `docs/assignment3` | SCRUM-270 | `docs/tasks/docs_assignment3.md` |
+
+### Finish each task (in the GitHub UI)
+
+1. Move the Jira task **To Do → In Progress**.
+2. Open a **Pull Request**: base = `main`, compare = the feature branch
+   (`https://github.com/irasiii/<repo>/pull/new/<branch>`).
+3. **CI runs** (`ci.yml` → jobs **Backend CI** + **Frontend CI**). Wait for green.
+4. Review the diff, then **Merge pull request**.
+5. Move the Jira task **→ Done**.
+
+Then promote: open a PR base = `production`, compare = `main` → `deploy.yml` posts the
+terraform plan → merge → `redeploy.yml` ships to the App EC2.
+
+### Enforce "no merge without passing tests" (branch protection) — REQUIRED
+
+This makes GitHub **block the Merge button until CI is green**, and re-tests the merge
+against the latest `main` so a merge can never break `main`. Set it once per repo:
+
+1. Open **one** PR first and let `ci.yml` run once — GitHub only lists a check after it has
+   run at least once. (Check names: **Backend CI**, **Frontend CI**.)
+2. Repo → **Settings → Branches → Add branch protection rule** (or **Settings → Rules →
+   Rulesets → New branch ruleset**).
+3. Branch name pattern: `main`.
+4. Tick:
+   - ☑ **Require a pull request before merging** (blocks direct pushes to `main`).
+   - ☑ **Require status checks to pass before merging** → select **Backend CI** and
+     **Frontend CI**.
+   - ☑ **Require branches to be up to date before merging** ← re-runs CI on the merge
+     result, so `main` can't be broken by a stale branch.
+   - ☑ (optional) **Do not allow bypassing the above settings** (include admins).
+5. **Save.** Repeat with pattern `production` to gate deploys.
+
+> **Why the assistant can't toggle this:** branch-protection, PR create/merge, and
+> `workflow_dispatch` all go through `api.github.com`, which is blocked from the sandbox.
+> Branch pushes work; protection + PR + merge + CI are your clicks in the UI.
+
+---
+
+## 15. Cheat sheet
+
+```bash
+# run locally
+cd backend && npm run dev
+cd frontend && npm run dev
+npm run seed                      # reseed DB
+
+# tests
+cd backend && npm test            # 40 passing
+npx mocha --grep "Strategy"
+
+# git: new task branch
+git checkout main && git checkout -b feature/<name>
+git add <files> && git commit -m "feat: ..."
+git push -u origin feature/<name>
+
+# PR + merge (gh CLI, if api reachable)
+gh pr create --base main --head feature/<name> --fill
+gh pr merge feature/<name> --merge --delete-branch
+
+# promote to production (deploys)
+gh pr create --base production --head main --fill
+gh pr merge --merge
+
+# AWS via Terraform (local)
+cd terraform && terraform init && terraform plan && terraform apply
+terraform output summary
+terraform destroy                 # when done
+```
+
+---
+
+*Personal runbook — keep in the repo root so the whole team follows the same steps.*
+
+*Last updated: 2026-06-21 — stacked the 3 code branches on event-ticket_2; verified CI
+(40 passing, build ok, integrated merge clean); added branch-protection setup (§14).*
