@@ -446,7 +446,78 @@ terraform destroy                 # when done
 
 ---
 
+---
+
+## 16. Real API testing on the deployed stack (Newman)
+
+Postman is a desktop GUI — it won't run on a headless EC2. **Newman** is Postman's CLI and
+runs the *same* exported collection. It's wired up two ways:
+
+- **Automatic at boot** — `terraform/user_data/app.sh` installs Newman and runs an initial
+  test after the API starts, writing `~/app/newman-report.html`.
+- **Automatic in CI** — the `smoke-test` job in `redeploy.yml` runs Newman from a GitHub
+  runner against `http://${EC2_APP_HOST}` after every deploy and uploads `newman-report`.
+- **Manual on the app host:**
+  ```bash
+  cd ~/app && bash scripts/run_api_tests.sh           # tests http://localhost:5000
+  # copy the report to your PC:
+  scp -i $key ec2-user@<app-ip>:~/app/newman-report.html .
+  ```
+
+For a guaranteed green run, reseed first so the DB is clean:
+```bash
+cd ~/app && git pull origin main
+cd backend && npm run seed && cd ..
+bash scripts/run_api_tests.sh
+```
+
+### Collection design rules we had to fix (so the run is green)
+- **Order:** Categories + Venues are created **before** Events (Create event needs
+  `categoryId`/`venueId`), and **Bookings run before any deletes** (booking a *cancelled*
+  event returns 400).
+- **Cleanup phase last:** destructive deletes run at the end in order
+  **event → clone event → venue → category** (the Prototype clone is a draft event that
+  also uses the venue, so it must be deleted before the venue, or venue-delete returns 400).
+- **Idempotent register:** the Register request uses `jane.tester+{{$timestamp}}@example.com`
+  so re-runs don't hit "email already in use".
+- **Capture ids:** `List users` saves `userId`; `Clone event` saves `clonedEventId`.
+
+## 17. From-scratch deploy (demolish → rebuild) + every gotcha we hit
+
+### Tear down — DON'T rely on `terraform destroy`
+There is **no S3 backend**, so Terraform state lived only on the Actions runner and is gone
+after apply. A `destroy` run starts with empty state and won't find your resources. Instead:
+- **AWS Console:** terminate both EC2s, then delete their security groups, or
+- **Script:** `python scripts/aws_teardown.py --region us-east-1 --execute`
+  (dry-run first without `--execute`; scoped to the `Project=event-ticketing` tag).
+
+### Rebuild — clean sequence
+1. **Apply:** Actions → *AWS Infrastructure CI/CD* → Run workflow → **Branch = `production`**
+   → `action = apply`. (~5 min. App auto-clones event-ticket_3, seeds, starts API, installs
+   Newman + runs an initial test.)
+2. **Get the new App public IP** from the run summary (it changes every apply).
+3. **Update the `EC2_APP_HOST`** secret to that IP.
+4. **SSH in** and run the real test (see §16). New key each run only if you recreated the
+   key pair.
+5. **Trigger CI deploy + smoke-test:** push `main → production`.
+
+### Gotchas (cause → fix) — keep this list handy
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Could not load credentials from any providers` (Terraform Plan, 4s) | AWS secrets not set **on this repo** (secrets are per-repo, don't copy across) | Add `AWS_ACCESS_KEY_ID/SECRET`, `AWS_KEY_PAIR_NAME`, `MONGO_PASSWORD`, `JWT_SECRET` to event-ticket_3 |
+| `Redeploy` fails ~13s at SSH | EC2 not provisioned yet, or `EC2_APP_HOST=placeholder` | Run `apply` first; set `EC2_APP_HOST` to the new IP |
+| App EC2 runs the wrong code | `deploy.yml` cloned `event-ticket` (A1) | Fixed: it now clones `event-ticket_3` |
+| `not a recognised key file format` (PuTTY) | `.pem` is OpenSSH, PuTTY needs `.ppk` | PuTTYgen → Load → Save private key (.ppk); or use Windows `ssh` |
+| `UNPROTECTED PRIVATE KEY FILE` / `bad permissions` | Windows ACLs too open on `.pem` | `icacls $key /inheritance:r /grant:r "$($env:USERNAME):R"` |
+| `Load key … invalid format` | key has BOM/UTF-16, or it's a `.ppk` | re-download `.pem`, or PuTTYgen → Export OpenSSH key |
+| `Permission denied (publickey)` (perms OK) | `.pem` doesn't match `AWS_KEY_PAIR_NAME` | use the matching key, or recreate key pair + re-apply |
+| `EACCES … /usr/lib/node_modules/newman` | global npm install needs root on EC2 | `sudo npm install -g newman` (the script now falls back to sudo) |
+| Create event `400`; booking `404` cascade | collection ordering (see §16) | fixed in the collection |
+| `Delete venue 400` "used by active event" | leftover draft (the Prototype clone) | Cleanup deletes the clone before the venue |
+
+---
+
 *Personal runbook — keep in the repo root so the whole team follows the same steps.*
 
-*Last updated: 2026-06-21 — stacked the 3 code branches on event-ticket_2; verified CI
-(40 passing, build ok, integrated merge clean); added branch-protection setup (§14).*
+*Last updated: 2026-06-21 — added §16 real API testing (Newman) and §17 from-scratch deploy
++ full gotchas table (SSH key, perms, per-repo secrets, ephemeral TF state, collection fixes).*
