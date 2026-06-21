@@ -31,7 +31,9 @@ fi
 # 1) Ensure Newman is installed (Node.js is already on the app server)
 if ! command -v newman >/dev/null 2>&1; then
   echo "==> Installing Newman (Postman CLI) + HTML reporter..."
-  npm install -g newman newman-reporter-htmlextra
+  # global install needs root on EC2 but not on CI runners — try plain, fall back to sudo
+  npm install -g newman newman-reporter-htmlextra 2>/dev/null \
+    || sudo npm install -g newman newman-reporter-htmlextra
 fi
 
 # 2) Optional: make sure the API is up before testing
