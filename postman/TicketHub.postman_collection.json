@@ -727,7 +727,8 @@
                 "exec": [
                   "pm.test('created', () => pm.expect(pm.response.code).to.equal(201));",
                   "const d = pm.response.json();",
-                  "pm.test('clone is a fresh draft', () => pm.expect(d.event.status).to.equal('draft'));"
+                  "pm.test('clone is a fresh draft', () => pm.expect(d.event.status).to.equal('draft'));",
+                  "if (d.event && d.event._id) pm.collectionVariables.set('clonedEventId', d.event._id);"
                 ]
               }
             }
@@ -1272,6 +1273,46 @@
                 "api",
                 "events",
                 "{{eventId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status ok', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete clone event (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/events/{{clonedEventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "events",
+                "{{clonedEventId}}"
               ]
             },
             "description": ""
