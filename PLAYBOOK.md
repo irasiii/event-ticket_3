@@ -345,11 +345,11 @@ Each Jira task has its own branch with its own commit/file. Open a PR per branch
 
 ### event-ticket_2 (assignment_2) — branches carry the real files
 
-| Branch | Jira | Commit | Contents |
-|---|---|---|---|
-| `feature/oop-principles` | SCRUM-262 | 1022dc0 | `backend/domain/*` + `authController.js` |
-| `feature/design-patterns` | SCRUM-263 | 31ba951 | `backend/patterns/*` + `services/bookingService.js` + controllers + `eventRoutes.js` |
-| `feature/unit-testing` | SCRUM-264 | 27e0ccf | `backend/test/*` + `package.json` / `package-lock.json` |
-| `feature/postman-tests` | SCRUM-265 | bbaf377 | `postman/*` |
-| `feature/aws-cicd` | SCRUM-266 | ba00223 | `DEPLOYMENT.md`, `arch.png` |
-| `docs/assignment2` | 
+The 3 **code** branches are **stacked** (`oop ⊂ design-patterns ⊂ unit-testing`) so the
+tests have the code they import — otherwise the unit-testing PR would fail CI with
+"Cannot find module". CI verified: `npm test` → **40 passing** on `feature/unit-testing`.
+
+| Branch | Jira | Commit | Built on | Contents | CI |
+|---|---|---|---|---|---|
+| `feature/oop-principles` | SCRUM-262 | e7f5fb0 | main | `backend/domain/*` + `authController.js` | green (tests skipped — no test script) |
+| `feature/design-patterns` | SCRUM-263 | 40aacd3 | oop | `backe
